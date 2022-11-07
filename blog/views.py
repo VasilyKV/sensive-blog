@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.db.models import Count
+from django.db.models import Prefetch
 
 from blog.models import Comment, Post, Tag
 
@@ -33,7 +34,7 @@ def serialize_post_optimized(post):
         'published_at': post.published_at,
         'slug': post.slug,
         # 'tags': [{'title':'dd','posts_with_tag':0 }],
-        'tags': [serialize_tag(tag) for tag in post.tags.annotate(posts_with_tag=Count('posts'))], # .annotat Работает не верно, количество постов при такой конструкцции считается неверно
+        'tags': [serialize_tag(tag) for tag in post.tags.all()],
         # 'tags': [serialize_tag(tag) for tag in post.tags.all()],
         'first_tag_title': post.tags.all()[0].title,
     }
@@ -51,12 +52,12 @@ def index(request):
 
     most_popular_posts = Post.objects.popular() \
         .prefetch_related('author')[:5] \
-        .prefetch_related('tags') \
+        .prefetch_related(Prefetch('tags', queryset=Tag.objects.annotate(posts_with_tag=Count('posts')))) \
         .fetch_with_comments_count()
     most_fresh_posts = Post.objects.annotate(comments_count=Count('comments')) \
         .order_by('-published_at') \
         .prefetch_related('author')[:5] \
-        .prefetch_related('tags')
+        .prefetch_related(Prefetch('tags', queryset=Tag.objects.annotate(posts_with_tag=Count('posts'))))
     most_popular_tags = Tag.objects.popular()[:5]
     
     context = {
